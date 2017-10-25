@@ -4,17 +4,14 @@ type FiberRootContainer = { _reactRootContainer: { current: FiberComponent } };
 
 type FiberComponent<P = {}> = {
     memoizedState: {
-        element: ReactElement<P>,
-    },
-    stateNode: Node & {container?: FiberRootContainer},
-    child: FiberComponent,
-    sibling: FiberComponent,
-    type: null | string | {displayName: string, name: string},
-    return: FiberComponent,
-}
-
-
-function defineSelectorProperty(s: string) {}
+        element: ReactElement<P>;
+    };
+    stateNode: Node & { container?: FiberRootContainer };
+    child: FiberComponent;
+    sibling: FiberComponent;
+    type: null | string | { displayName: string; name: string };
+    return: FiberComponent;
+};
 
 export function react16Selector(rootElements: Node[], selector: string) {
     let visitedRootEls: FiberComponent[] = [];
@@ -33,11 +30,11 @@ export function react16Selector(rootElements: Node[], selector: string) {
 
     /*eslint-enable no-unused-vars*/
     function createAnnotationForEmptyComponent(component: any) {
-        const comment = document.createComment('testcafe-react-selectors: the requested component didn\'t render any DOM elements');
+        const comment = document.createComment(
+            "testcafe-react-selectors: the requested component didn't render any DOM elements"
+        );
 
         (comment as any).__$$reactInstance = component;
-
-        window['%testCafeReactEmptyComponent%'] = comment;
 
         return comment;
     }
@@ -47,9 +44,11 @@ export function react16Selector(rootElements: Node[], selector: string) {
 
         const currentElementType = component.type ? component.type : component.memoizedState.element.type;
 
-        //NOTE: tag
-        if (typeof currentElementType === 'string') return currentElementType;
-        if (currentElementType.displayName || currentElementType.name) return currentElementType.displayName || currentElementType.name;
+        // NOTE: tag
+        if (typeof currentElementType === "string") return currentElementType;
+        if (currentElementType.displayName || currentElementType.name) {
+            return currentElementType.displayName || currentElementType.name;
+        }
 
         const matches = currentElementType.toString().match(/^function\s*([^\s(]+)/);
 
@@ -71,23 +70,22 @@ export function react16Selector(rootElements: Node[], selector: string) {
         return node.stateNode;
     }
 
-    if (!window['%testCafeReactSelectorUtils%']) window['%testCafeReactSelectorUtils%'] = {
-        getName
-    };
-
     function getRenderedChildren(component: FiberComponent) {
         const isRootComponent = rootEls.indexOf(component) > -1;
 
-        //Nested root element
+        // Nested root element
         if (isRootComponent) {
             if (checkRootNodeVisited(component)) return [];
 
             visitedRootEls.push(component);
         }
 
-        //Portal component
+        // Portal component
         if (!component.child) {
-            const portalRoot = component.stateNode && component.stateNode.container && component.stateNode.container._reactRootContainer;
+            const portalRoot =
+                component.stateNode &&
+                component.stateNode.container &&
+                component.stateNode.container._reactRootContainer;
 
             if (portalRoot) component = portalRoot.current;
         }
@@ -96,7 +94,9 @@ export function react16Selector(rootElements: Node[], selector: string) {
 
         let currentChild = component.child;
 
-        if (typeof component.type !== 'string') currentChild = component.child;
+        if (typeof component.type !== "string") {
+            currentChild = component.child;
+        }
 
         const children = [currentChild];
 
@@ -110,7 +110,8 @@ export function react16Selector(rootElements: Node[], selector: string) {
     }
 
     function parseSelectorElements(compositeSelector: string) {
-        return compositeSelector.split(' ')
+        return compositeSelector
+            .split(" ")
             .filter(el => !!el)
             .map(el => el.trim());
     }
@@ -119,14 +120,12 @@ export function react16Selector(rootElements: Node[], selector: string) {
         const foundComponents: Node[] = [];
 
         function findDOMNode(rootComponent: FiberComponent) {
-            if (typeof compositeSelector !== 'string') throw new Error(`Selector option is expected to be a string, but it was $ {
-                typeof compositeSelector
-            }.`);
+            if (typeof compositeSelector !== "string") {
+                throw new Error(`Selector option is expected to be a string, but it was ${typeof compositeSelector}.`);
+            }
 
-            var selectorIndex = 0;
-            var selectorElms = parseSelectorElements(compositeSelector);
-
-            if (selectorElms.length) defineSelectorProperty(selectorElms[selectorElms.length - 1]);
+            let selectorIndex = 0;
+            const selectorElms = parseSelectorElements(compositeSelector);
 
             function walk(reactComponent: FiberComponent, cb: (comp: FiberComponent) => boolean) {
                 if (!reactComponent) return;
@@ -139,14 +138,14 @@ export function react16Selector(rootElements: Node[], selector: string) {
                 if (isNotFirstSelectorPart && !componentWasFound) {
                     const isTag = selectorElms[selectorIndex].toLowerCase() === selectorElms[selectorIndex];
 
-                    //NOTE: we're looking for only between the children of component
+                    // NOTE: we're looking for only between the children of component
                     if (isTag && getName(reactComponent.return) !== selectorElms[selectorIndex - 1]) return;
                 }
 
                 const renderedChildren = getRenderedChildren(reactComponent);
 
-                Object.keys(renderedChildren).forEach(key => {
-                    walk(renderedChildren[key], cb);
+                renderedChildren.forEach(child => {
+                    walk(child, cb);
 
                     selectorIndex = currSelectorIndex;
                 });
@@ -160,9 +159,13 @@ export function react16Selector(rootElements: Node[], selector: string) {
 
                 const domNode = getContainer(reactComponent);
 
-                if (selectorElms[selectorIndex] !== componentName) return false;
+                if (selectorElms[selectorIndex] !== componentName) {
+                    return false;
+                }
 
-                if (selectorIndex === selectorElms.length - 1) foundComponents.push(domNode || createAnnotationForEmptyComponent(reactComponent));
+                if (selectorIndex === selectorElms.length - 1) {
+                    foundComponents.push(domNode || createAnnotationForEmptyComponent(reactComponent));
+                }
 
                 selectorIndex++;
 
