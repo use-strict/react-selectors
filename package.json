@@ -1,6 +1,6 @@
 {
   "name": "react-selectors",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "",
   "keywords": [],
   "main": "dist/react-selectors.umd.js",
@@ -12,7 +12,7 @@
   "author": "JLarky <jlarky@gmail.com>",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/JLarky/react-selectors"
   },
   "license": "MIT",
   "engines": {
