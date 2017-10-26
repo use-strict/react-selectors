@@ -1,182 +1,198 @@
-import { ReactElement } from "react";
+import { ReactElement } from 'react'
 
-type FiberRootContainer = { _reactRootContainer: { current: FiberComponent } };
+type FiberRootContainer = { _reactRootContainer: { current: FiberComponent } }
 
 type FiberComponent<P = {}> = {
-    memoizedState: {
-        element: ReactElement<P>;
-    };
-    stateNode: Node & { container?: FiberRootContainer };
-    child: FiberComponent;
-    sibling: FiberComponent;
-    type: null | string | { displayName: string; name: string };
-    return: FiberComponent;
-};
+  memoizedState: {
+    element: ReactElement<P>
+  }
+  stateNode: Node & { container?: FiberRootContainer }
+  child: FiberComponent
+  sibling: FiberComponent
+  type: null | string | { displayName: string; name: string }
+  return: FiberComponent
+}
 
 export function react16Selector(rootElements: Node[], selector: string) {
-    let visitedRootEls: FiberComponent[] = [];
+  let visitedRootEls: FiberComponent[] = []
 
-    function checkRootNodeVisited(component: FiberComponent) {
-        return visitedRootEls.indexOf(component) !== -1;
+  function checkRootNodeVisited(component: FiberComponent) {
+    return visitedRootEls.indexOf(component) !== -1
+  }
+
+  const roots = rootElements.map((x: any) => {
+    if (!x._reactRootContainer) {
+      throw new Error('Element has to be React 16 root element')
+    }
+    return x as FiberRootContainer
+  })
+  const rootEls = roots.map(x => x._reactRootContainer.current)
+
+  /*eslint-enable no-unused-vars*/
+  function createAnnotationForEmptyComponent(component: any) {
+    const comment = document.createComment(
+      "testcafe-react-selectors: the requested component didn't render any DOM elements"
+    )
+
+    ;(comment as any).__$$reactInstance = component
+
+    return comment
+  }
+
+  function getName(component: FiberComponent) {
+    if (!component.type && !component.memoizedState) return null
+
+    const currentElementType = component.type
+      ? component.type
+      : component.memoizedState.element.type
+
+    // NOTE: tag
+    if (typeof currentElementType === 'string') return currentElementType
+    if (currentElementType.displayName || currentElementType.name) {
+      return currentElementType.displayName || currentElementType.name
     }
 
-    const roots = rootElements.map((x: any) => {
-        if (!x._reactRootContainer) {
-            throw new Error("Element has to be React 16 root element");
-        }
-        return x as FiberRootContainer;
-    });
-    const rootEls = roots.map(x => x._reactRootContainer.current);
+    const matches = currentElementType.toString().match(/^function\s*([^\s(]+)/)
 
-    /*eslint-enable no-unused-vars*/
-    function createAnnotationForEmptyComponent(component: any) {
-        const comment = document.createComment(
-            "testcafe-react-selectors: the requested component didn't render any DOM elements"
-        );
+    if (matches) return matches[1]
 
-        (comment as any).__$$reactInstance = component;
+    return null
+  }
 
-        return comment;
+  function getContainer(component: FiberComponent) {
+    let node = component
+
+    while (!(typeof node.stateNode === 'object')) {
+      if (node.child) node = node.child
+      else break
     }
 
-    function getName(component: FiberComponent) {
-        if (!component.type && !component.memoizedState) return null;
+    if (!(typeof node.stateNode === 'object')) return null
 
-        const currentElementType = component.type ? component.type : component.memoizedState.element.type;
+    return node.stateNode
+  }
 
-        // NOTE: tag
-        if (typeof currentElementType === "string") return currentElementType;
-        if (currentElementType.displayName || currentElementType.name) {
-            return currentElementType.displayName || currentElementType.name;
-        }
+  function getRenderedChildren(component: FiberComponent) {
+    const isRootComponent = rootEls.indexOf(component) > -1
 
-        const matches = currentElementType.toString().match(/^function\s*([^\s(]+)/);
+    // Nested root element
+    if (isRootComponent) {
+      if (checkRootNodeVisited(component)) return []
 
-        if (matches) return matches[1];
-
-        return null;
+      visitedRootEls.push(component)
     }
 
-    function getContainer(component: FiberComponent) {
-        let node = component;
+    // Portal component
+    if (!component.child) {
+      const portalRoot =
+        component.stateNode &&
+        component.stateNode.container &&
+        component.stateNode.container._reactRootContainer
 
-        while (!(node.stateNode instanceof Node)) {
-            if (node.child) node = node.child;
-            else break;
-        }
-
-        if (!(node.stateNode instanceof Node)) return null;
-
-        return node.stateNode;
+      if (portalRoot) component = portalRoot.current
     }
 
-    function getRenderedChildren(component: FiberComponent) {
-        const isRootComponent = rootEls.indexOf(component) > -1;
+    if (!component.child) return []
 
-        // Nested root element
-        if (isRootComponent) {
-            if (checkRootNodeVisited(component)) return [];
+    let currentChild = component.child
 
-            visitedRootEls.push(component);
-        }
-
-        // Portal component
-        if (!component.child) {
-            const portalRoot =
-                component.stateNode &&
-                component.stateNode.container &&
-                component.stateNode.container._reactRootContainer;
-
-            if (portalRoot) component = portalRoot.current;
-        }
-
-        if (!component.child) return [];
-
-        let currentChild = component.child;
-
-        if (typeof component.type !== "string") {
-            currentChild = component.child;
-        }
-
-        const children = [currentChild];
-
-        while (currentChild.sibling) {
-            children.push(currentChild.sibling);
-
-            currentChild = currentChild.sibling;
-        }
-
-        return children;
+    if (typeof component.type !== 'string') {
+      currentChild = component.child
     }
 
-    function parseSelectorElements(compositeSelector: string) {
-        return compositeSelector
-            .split(" ")
-            .filter(el => !!el)
-            .map(el => el.trim());
+    const children = [currentChild]
+
+    while (currentChild.sibling) {
+      children.push(currentChild.sibling)
+
+      currentChild = currentChild.sibling
     }
 
-    function reactSelect(compositeSelector: string) {
-        const foundComponents: Node[] = [];
+    return children
+  }
 
-        function findDOMNode(rootComponent: FiberComponent) {
-            if (typeof compositeSelector !== "string") {
-                throw new Error(`Selector option is expected to be a string, but it was ${typeof compositeSelector}.`);
-            }
+  function parseSelectorElements(compositeSelector: string) {
+    return compositeSelector
+      .split(' ')
+      .filter(el => !!el)
+      .map(el => el.trim())
+  }
 
-            let selectorIndex = 0;
-            const selectorElms = parseSelectorElements(compositeSelector);
+  function reactSelect(compositeSelector: string) {
+    const foundComponents: Node[] = []
 
-            function walk(reactComponent: FiberComponent, cb: (comp: FiberComponent) => boolean) {
-                if (!reactComponent) return;
+    function findDOMNode(rootComponent: FiberComponent) {
+      if (typeof compositeSelector !== 'string') {
+        throw new Error(
+          `Selector option is expected to be a string, but it was ${typeof compositeSelector}.`
+        )
+      }
 
-                const componentWasFound = cb(reactComponent);
-                const currSelectorIndex = selectorIndex;
+      let selectorIndex = 0
+      const selectorElms = parseSelectorElements(compositeSelector)
 
-                const isNotFirstSelectorPart = selectorIndex > 0 && selectorIndex < selectorElms.length;
+      function walk(
+        reactComponent: FiberComponent,
+        cb: (comp: FiberComponent) => boolean
+      ) {
+        if (!reactComponent) return
 
-                if (isNotFirstSelectorPart && !componentWasFound) {
-                    const isTag = selectorElms[selectorIndex].toLowerCase() === selectorElms[selectorIndex];
+        const componentWasFound = cb(reactComponent)
+        const currSelectorIndex = selectorIndex
 
-                    // NOTE: we're looking for only between the children of component
-                    if (isTag && getName(reactComponent.return) !== selectorElms[selectorIndex - 1]) return;
-                }
+        const isNotFirstSelectorPart =
+          selectorIndex > 0 && selectorIndex < selectorElms.length
 
-                const renderedChildren = getRenderedChildren(reactComponent);
+        if (isNotFirstSelectorPart && !componentWasFound) {
+          const isTag =
+            selectorElms[selectorIndex].toLowerCase() ===
+            selectorElms[selectorIndex]
 
-                renderedChildren.forEach(child => {
-                    walk(child, cb);
-
-                    selectorIndex = currSelectorIndex;
-                });
-            }
-
-            return walk(rootComponent, reactComponent => {
-                const componentName = getName(reactComponent);
-                // console.log(componentName);
-
-                if (!componentName) return false;
-
-                const domNode = getContainer(reactComponent);
-
-                if (selectorElms[selectorIndex] !== componentName) {
-                    return false;
-                }
-
-                if (selectorIndex === selectorElms.length - 1) {
-                    foundComponents.push(domNode || createAnnotationForEmptyComponent(reactComponent));
-                }
-
-                selectorIndex++;
-
-                return true;
-            });
+          // NOTE: we're looking for only between the children of component
+          if (
+            isTag &&
+            getName(reactComponent.return) !== selectorElms[selectorIndex - 1]
+          )
+            return
         }
 
-        rootEls.forEach(findDOMNode);
+        const renderedChildren = getRenderedChildren(reactComponent)
 
-        return foundComponents;
+        renderedChildren.forEach(child => {
+          walk(child, cb)
+
+          selectorIndex = currSelectorIndex
+        })
+      }
+
+      return walk(rootComponent, reactComponent => {
+        const componentName = getName(reactComponent)
+        // console.log(componentName);
+
+        if (!componentName) return false
+
+        const domNode = getContainer(reactComponent)
+
+        if (selectorElms[selectorIndex] !== componentName) {
+          return false
+        }
+
+        if (selectorIndex === selectorElms.length - 1) {
+          foundComponents.push(
+            domNode || createAnnotationForEmptyComponent(reactComponent)
+          )
+        }
+
+        selectorIndex++
+
+        return true
+      })
     }
 
-    return reactSelect(selector);
+    rootEls.forEach(findDOMNode)
+
+    return foundComponents
+  }
+
+  return reactSelect(selector)
 }
