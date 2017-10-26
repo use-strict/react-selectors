@@ -33,7 +33,6 @@ export function react16Selector(rootElements: Node[], selector: string) {
     const comment = document.createComment(
       "testcafe-react-selectors: the requested component didn't render any DOM elements"
     )
-
     ;(comment as any).__$$reactInstance = component
 
     return comment
@@ -62,12 +61,12 @@ export function react16Selector(rootElements: Node[], selector: string) {
   function getContainer(component: FiberComponent) {
     let node = component
 
-    while (!(typeof node.stateNode === 'object')) {
+    while (!(node.stateNode && 'appendChild' in node.stateNode)) {
       if (node.child) node = node.child
       else break
     }
 
-    if (!(typeof node.stateNode === 'object')) return null
+    if (!(node.stateNode && 'appendChild' in node.stateNode)) return null
 
     return node.stateNode
   }
