@@ -1,6 +1,16 @@
 import { ReactElement } from 'react'
 
-type FiberRootContainer = { _reactRootContainer: { current: FiberComponent } }
+type Fiber6RootContainer = {
+  current: FiberComponent
+}
+
+type Fiber63RootContainer = {
+  _internalRoot: Fiber6RootContainer
+}
+
+type FiberRootContainer = {
+  _reactRootContainer: Fiber6RootContainer | Fiber63RootContainer
+}
 
 type FiberComponent<P = {}> = {
   memoizedState: {
@@ -26,7 +36,12 @@ export function react16Selector(rootElements: Node[], selector: string) {
     }
     return x as FiberRootContainer
   })
-  const rootEls = roots.map(x => x._reactRootContainer.current)
+  const rootEls = roots.map(
+    x =>
+      (x._reactRootContainer as Fiber63RootContainer)._internalRoot
+        ? (x._reactRootContainer as Fiber63RootContainer)._internalRoot.current
+        : (x._reactRootContainer as Fiber6RootContainer).current
+  )
 
   /*eslint-enable no-unused-vars*/
   function createAnnotationForEmptyComponent(component: any) {
@@ -61,12 +76,12 @@ export function react16Selector(rootElements: Node[], selector: string) {
   function getContainer(component: FiberComponent) {
     let node = component
 
-    while (!(node.stateNode && 'appendChild' in node.stateNode)) {
+    while (!(node.stateNode instanceof Node)) {
       if (node.child) node = node.child
       else break
     }
 
-    if (!(node.stateNode && 'appendChild' in node.stateNode)) return null
+    if (!(node.stateNode instanceof Node)) return null
 
     return node.stateNode
   }
@@ -88,7 +103,11 @@ export function react16Selector(rootElements: Node[], selector: string) {
         component.stateNode.container &&
         component.stateNode.container._reactRootContainer
 
-      if (portalRoot) component = portalRoot.current
+      if (portalRoot) {
+        component = (portalRoot as Fiber63RootContainer)._internalRoot
+          ? (portalRoot as Fiber63RootContainer)._internalRoot.current
+          : (portalRoot as Fiber6RootContainer).current
+      }
     }
 
     if (!component.child) return []
@@ -151,8 +170,9 @@ export function react16Selector(rootElements: Node[], selector: string) {
           if (
             isTag &&
             getName(reactComponent.return) !== selectorElms[selectorIndex - 1]
-          )
+          ) {
             return
+          }
         }
 
         const renderedChildren = getRenderedChildren(reactComponent)
